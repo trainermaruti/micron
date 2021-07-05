@@ -1,0 +1,84 @@
+az account set --subscription <SUBSCRIPTION ID>
+az provider register -n Microsoft.RedHatOpenShift --wait
+az provider register -n Microsoft.Compute --wait
+az provider register -n Microsoft.Storage --wait
+
+LOCATION=eastus                 # the location of your cluster
+RESOURCEGROUP=Marutiaro-rg            # the name of the resource group where you want to create your cluster
+CLUSTER=cluster273               # the name of your cluster
+
+az group create \
+  --name $RESOURCEGROUP \
+  --location $LOCATION
+
+az network vnet create \
+   --resource-group $RESOURCEGROUP \
+   --name aro-vnet \
+   --address-prefixes 10.0.0.0/22
+
+az network vnet subnet create \
+  --resource-group $RESOURCEGROUP \
+  --vnet-name aro-vnet \
+  --name master-subnet \
+  --address-prefixes 10.0.0.0/23 \
+  --service-endpoints Microsoft.ContainerRegistry
+
+az network vnet subnet create \
+  --resource-group $RESOURCEGROUP \
+  --vnet-name aro-vnet \
+  --name worker-subnet \
+  --address-prefixes 10.0.2.0/23 \
+  --service-endpoints Microsoft.ContainerRegistry
+
+az network vnet subnet update \
+  --name master-subnet \
+  --resource-group $RESOURCEGROUP \
+  --vnet-name aro-vnet \
+  --disable-private-link-service-network-policies true
+
+az aro create \
+  --resource-group $RESOURCEGROUP \
+  --name $CLUSTER \
+  --vnet aro-vnet \
+  --master-subnet master-subnet \
+  --worker-subnet worker-subnet
+
+
+35-40 minutes waiting time
+
+#once created Connect to cluster
+
+az aro list-credentials \
+  --name $CLUSTER \
+  --resource-group $RESOURCEGROUP
+
+
+#output is 
+{
+  "kubeadminPassword": "j55qR-txikY-y3VAN-TPLkU",
+  "kubeadminUsername": "kubeadmin"
+}
+
+https://console-openshift-console.apps.swmul8kz.eastus.aroapp.io/
+https://console-openshift-console.apps.swmul8kz.eastus.aroapp.io/
+
+
+If you're running the commands on the Azure Cloud Shell, download the latest OpenShift 4 CLI for Linux.
+
+cd ~
+wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
+
+mkdir openshift
+tar -zxvf openshift-client-linux.tar.gz -C openshift
+echo 'export PATH=$PATH:~/openshift' >> ~/.bashrc && source ~/.bashrc
+
+Retrieve the API server's address.
+apiServer=$(az aro show -g $RESOURCEGROUP -n $CLUSTER --query apiserverProfile.url -o tsv)
+
+oc login $apiServer -u kubeadmin -p <kubeadmin password>
+
+
+Delete the cluster
+CLUSTER=cluster1
+RESOURCEGROUP=Marutiaro-rg
+az aro delete --resource-group $RESOURCEGROUP --name $CLUSTER
